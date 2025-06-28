@@ -268,6 +268,7 @@ def main() -> None:
             # إنشاء wrapper function للتعامل مع APScheduler
             async def fetch_news_wrapper():
                 """Wrapper function للتعامل مع APScheduler"""
+                logger.info("🔄 APScheduler: بدء دورة جلب الأخبار...")
                 try:
                     # إنشاء context object بسيط مع bot
                     class SimpleContext:
@@ -275,9 +276,11 @@ def main() -> None:
                             self.bot = bot
                     
                     context = SimpleContext(application.bot)
+                    logger.info("🔄 APScheduler: استدعاء fetch_and_send_news...")
                     await fetch_and_send_news(context)
+                    logger.info("✅ APScheduler: انتهاء دورة جلب الأخبار بنجاح")
                 except Exception as e:
-                    logger.error(f"خطأ في fetch_news_wrapper: {e}")
+                    logger.error(f"❌ خطأ في fetch_news_wrapper: {e}")
                     # محاولة إرسال رسالة خطأ للقناة
                     try:
                         channel_id = await get_channel_id(application.bot, TELEGRAM_CHANNEL_ID)
