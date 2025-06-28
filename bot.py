@@ -25,12 +25,21 @@ logger = logging.getLogger(__name__)
 async def get_channel_id(bot, channel_username):
     """تحويل معرف القناة من @username إلى معرف رقمي"""
     try:
+        # إذا كان المعرف يبدأ بـ @، نحاول تحويله
         if channel_username.startswith('@'):
-            chat = await bot.get_chat(channel_username)
-            return str(chat.id)
+            try:
+                chat = await bot.get_chat(channel_username)
+                logger.info(f"تم تحويل معرف القناة {channel_username} إلى {chat.id}")
+                return str(chat.id)
+            except Exception as chat_error:
+                logger.warning(f"فشل في تحويل معرف القناة {channel_username}: {chat_error}")
+                # إذا فشل التحويل، نستخدم المعرف كما هو
+                return channel_username
+        # إذا كان المعرف رقمي أو لا يبدأ بـ @، نستخدمه كما هو
         return channel_username
     except Exception as e:
         logger.error(f"خطأ في تحويل معرف القناة {channel_username}: {e}")
+        # في حالة أي خطأ، نستخدم المعرف الأصلي
         return channel_username
 
 # تم حذف أوامر التشغيل - البوت يعمل تلقائياً الآن
@@ -231,18 +240,16 @@ def main() -> None:
                 logger.error(f"❌ فشل في إرسال الرسالة التجريبية: {e}")
         
         # إرسال الرسالة التجريبية بعد ثانيتين
-        import asyncio
         import threading
         import time
         
         def send_test_message_delayed():
             time.sleep(2)
             try:
-                # إنشاء event loop جديد للرسالة التجريبية
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                loop.run_until_complete(send_test_message())
-                loop.close()
+                # استخدم event loop الخاص بـ application
+                loop = application.bot.loop if hasattr(application.bot, 'loop') else application.loop
+                import asyncio
+                asyncio.run_coroutine_threadsafe(send_test_message(), loop)
             except Exception as e:
                 logger.error(f"فشل في إرسال الرسالة التجريبية: {e}")
         
@@ -319,18 +326,16 @@ def main() -> None:
                     logger.error(f"❌ فشل في إرسال الرسالة التجريبية: {e}")
             
             # إرسال الرسالة التجريبية بعد ثانيتين
-            import asyncio
             import threading
             import time
             
             def send_test_message_delayed():
                 time.sleep(2)
                 try:
-                    # إنشاء event loop جديد للرسالة التجريبية
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                    loop.run_until_complete(send_test_message())
-                    loop.close()
+                    # استخدم event loop الخاص بـ application
+                    loop = application.bot.loop if hasattr(application.bot, 'loop') else application.loop
+                    import asyncio
+                    asyncio.run_coroutine_threadsafe(send_test_message(), loop)
                 except Exception as e:
                     logger.error(f"فشل في إرسال الرسالة التجريبية: {e}")
             
@@ -457,7 +462,7 @@ async def fetch_and_send_news(context):
     logger.info("🔄 بدء دورة جلب الأخبار الجديدة...")
     session = get_db_session()
     
-    # معالجة المصادر بشكل متزامن
+    # معالجة المصادر بشكل متزامن على نفس event loop
     tasks = [process_source(source, session) for source in NEWS_SOURCES]
     results = await asyncio.gather(*tasks)
     
@@ -703,35 +708,59 @@ async def _send_telegram_message(bot, image_url, text, title, category, article_
     """إرسال رسالة إلى التليجرام مع معالجة الأخطاء"""
     logger.info(f"📨 بدء _send_telegram_message للمقال: {title}")
     
-    keyboard = [[InlineKeyboardButton("📰 قراءة المزيد", callback_data=f'read_more:{article_id}')]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    try:
+        keyboard = [[InlineKeyboardButton("📰 قراءة المزيد", callback_data=f'read_more:{article_id}')]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
 
-    # تحويل معرف القناة إذا لزم الأمر
-    channel_id = await get_channel_id(bot, TELEGRAM_CHANNEL_ID)
-    logger.info(f"📢 إرسال إلى القناة: {channel_id}")
+        # تحويل معرف القناة إذا لزم الأمر
+        channel_id = await get_channel_id(bot, TELEGRAM_CHANNEL_ID)
+        logger.info(f"📢 إرسال إلى القناة: {channel_id}")
 
-    if image_url:
-        # إرسال الصورة مع النص
-        logger.info(f"🖼️ إرسال مقال مع صورة: {title}")
-        await bot.send_photo(
-            chat_id=channel_id,
-            photo=image_url,
-            caption=text,
-            parse_mode=parse_mode,
-            reply_markup=reply_markup
-        )
-        logger.info(f"✅ تم إرسال مقال مع صورة: {title} (الفئة: {category})")
-    else:
-        # إرسال نص فقط مع معاينة الرابط
-        logger.info(f"📝 إرسال مقال نصي: {title}")
-        await bot.send_message(
-            chat_id=channel_id,
-            text=text,
-            parse_mode=parse_mode,
-            disable_web_page_preview=False,  # إظهار معاينة الرابط
-            reply_markup=reply_markup
-        )
-        logger.info(f"✅ تم إرسال مقال نصي: {title} (الفئة: {category})")
+        if image_url:
+            # إرسال الصورة مع النص
+            logger.info(f"🖼️ إرسال مقال مع صورة: {title}")
+            await bot.send_photo(
+                chat_id=channel_id,
+                photo=image_url,
+                caption=text,
+                parse_mode=parse_mode,
+                reply_markup=reply_markup
+            )
+            logger.info(f"✅ تم إرسال مقال مع صورة: {title} (الفئة: {category})")
+        else:
+            # إرسال نص فقط مع معاينة الرابط
+            logger.info(f"📝 إرسال مقال نصي: {title}")
+            await bot.send_message(
+                chat_id=channel_id,
+                text=text,
+                parse_mode=parse_mode,
+                disable_web_page_preview=False,  # إظهار معاينة الرابط
+                reply_markup=reply_markup
+            )
+            logger.info(f"✅ تم إرسال مقال نصي: {title} (الفئة: {category})")
+    except Exception as e:
+        logger.error(f"❌ خطأ في _send_telegram_message للمقال {title}: {e}")
+        # محاولة إرسال بدون reply_markup في حالة فشل
+        try:
+            logger.info(f"🔄 محاولة إرسال بدون reply_markup: {title}")
+            if image_url:
+                await bot.send_photo(
+                    chat_id=channel_id,
+                    photo=image_url,
+                    caption=text,
+                    parse_mode=parse_mode
+                )
+            else:
+                await bot.send_message(
+                    chat_id=channel_id,
+                    text=text,
+                    parse_mode=parse_mode,
+                    disable_web_page_preview=False
+                )
+            logger.info(f"✅ تم إرسال المقال بدون reply_markup: {title}")
+        except Exception as e2:
+            logger.error(f"❌ فشل في إرسال المقال بدون reply_markup: {title} - {e2}")
+            raise e2
 
 
 if __name__ == "__main__":
