@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: algeria-news-bot
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHANNEL_ID
+        sync: false
+      - key: DATABASE_URL
+        value: sqlite:///news.db
+      - key: LOG_LEVEL
+        value: INFO
+      - key: CACHE_DIR
+        value: /tmp/cache
+      - key: RENDER
+        value: true 

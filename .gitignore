@@ -1,0 +1,65 @@
+# ملفات البيئة والإعدادات الحساسة
+.env
+*.env
+
+# ملفات قاعدة البيانات
+*.db
+*.sqlite
+*.sqlite3
+
+# ملفات السجلات
+*.log
+logs/
+
+# ملفات Python المؤقتة
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+PYMANIFEST
+
+# ملفات التخزين المؤقت
+cache/
+*.cache
+
+# ملفات البيانات المؤقتة
+*.json
+*.lock
+
+# ملفات النظام
+.DS_Store
+Thumbs.db
+
+# ملفات IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# البيئة الافتراضية
+venv/
+.venv/
+env/
+.env/
+
+# ملفات النسخ الاحتياطية
+*.bak
+*.backup
+*.old

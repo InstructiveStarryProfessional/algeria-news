@@ -1,0 +1,49 @@
+# ملفات Git
+.git
+.gitignore
+
+# ملفات Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env
+pip-log.txt
+pip-delete-this-directory.txt
+.tox
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesis
+
+# ملفات البيئة الافتراضية
+.venv
+venv/
+ENV/
+env/
+.venv/
+
+# ملفات النظام
+.DS_Store
+Thumbs.db
+
+# ملفات التطوير
+*.log
+bot.lock
+bot_errors.log
+
+# مجلدات التخزين المؤقت
+cache/
+__pycache__/
+
+# ملفات قاعدة البيانات (سيتم إنشاؤها في Runtime)
+*.db
+*.sqlite 

@@ -1,0 +1,21 @@
+# مكتبات أساسية للبوت
+python-telegram-bot==20.7
+aiohttp==3.9.1
+
+# معالجة البيانات والنصوص
+feedparser==6.0.10
+beautifulsoup4==4.12.2
+requests==2.31.0
+
+# قاعدة البيانات
+SQLAlchemy==2.0.23
+
+# معالجة الصور والوقت
+Pillow==10.1.0
+pytz==2023.3
+
+# إدارة البيئة
+python-dotenv==1.0.0
+
+# خادم الويب للتوافق مع Render
+Flask==3.0.0
