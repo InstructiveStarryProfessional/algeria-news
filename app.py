@@ -4,7 +4,11 @@ import os
 import threading
 import time
 from flask import Flask, jsonify
-from bot import main as bot_main
+import logging
+
+# إعداد التسجيل
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
@@ -47,9 +51,11 @@ def run_bot():
     """تشغيل البوت في خيط منفصل"""
     global bot_running
     try:
+        from bot import main as bot_main
+        logger.info("بدء تشغيل البوت...")
         bot_main()
     except Exception as e:
-        print(f"خطأ في تشغيل البوت: {e}")
+        logger.error(f"خطأ في تشغيل البوت: {e}")
     finally:
         bot_running = False
 
@@ -60,7 +66,9 @@ if __name__ == '__main__':
         bot_thread = threading.Thread(target=run_bot, daemon=True)
         bot_thread.start()
         bot_running = True
+        logger.info("تم بدء البوت في خيط منفصل")
     
     # تشغيل خادم Flask
     port = int(os.environ.get('PORT', 8000))
+    logger.info(f"بدء تشغيل خادم Flask على المنفذ {port}")
     app.run(host='0.0.0.0', port=port, debug=False) 

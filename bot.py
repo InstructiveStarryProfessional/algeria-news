@@ -194,14 +194,46 @@ def main() -> None:
 
     # جدولة مهمة جمع الأخبار كل 30 ثانية
     job_queue = application.job_queue
-    job_queue.run_repeating(fetch_and_send_news, interval=30, first=10) # 30 seconds
-    
-    # جدولة تنظيف التخزين المؤقت كل ساعة
-    job_queue.run_repeating(lambda context: cache_manager.clear_old_cache(), interval=3600, first=3600)
-
-    logger.info("🚀 بوت أخبار الجزائر بدأ العمل تلقائياً...")
-    logger.info("📰 سيتم جلب الأخبار فور صدورها ونشرها كل 30 ثانية")
-    logger.info("🗂️ سيتم تنظيف التخزين المؤقت كل ساعة")
+    if job_queue is not None:
+        job_queue.run_repeating(fetch_and_send_news, interval=30, first=10) # 30 seconds
+        
+        # جدولة تنظيف التخزين المؤقت كل ساعة
+        job_queue.run_repeating(lambda context: cache_manager.clear_old_cache(), interval=3600, first=3600)
+        
+        logger.info("🚀 بوت أخبار الجزائر بدأ العمل تلقائياً...")
+        logger.info("📰 سيتم جلب الأخبار فور صدورها ونشرها كل 30 ثانية")
+        logger.info("🗂️ سيتم تنظيف التخزين المؤقت كل ساعة")
+    else:
+        logger.warning("⚠️ JobQueue غير متاح. استخدام APScheduler كبديل...")
+        try:
+            from apscheduler.schedulers.asyncio import AsyncIOScheduler
+            from apscheduler.triggers.interval import IntervalTrigger
+            
+            scheduler = AsyncIOScheduler()
+            
+            # جدولة مهمة جمع الأخبار كل 30 ثانية
+            scheduler.add_job(
+                fetch_and_send_news,
+                IntervalTrigger(seconds=30),
+                id='fetch_news',
+                replace_existing=True
+            )
+            
+            # جدولة تنظيف التخزين المؤقت كل ساعة
+            scheduler.add_job(
+                lambda: cache_manager.clear_old_cache(),
+                IntervalTrigger(hours=1),
+                id='clear_cache',
+                replace_existing=True
+            )
+            
+            scheduler.start()
+            logger.info("🚀 بوت أخبار الجزائر بدأ العمل مع APScheduler...")
+            logger.info("📰 سيتم جلب الأخبار فور صدورها ونشرها كل 30 ثانية")
+            logger.info("🗂️ سيتم تنظيف التخزين المؤقت كل ساعة")
+        except ImportError:
+            logger.error("❌ APScheduler غير متاح. البوت سيعمل بدون جدولة تلقائية.")
+            logger.info("🚀 بوت أخبار الجزائر بدأ العمل بدون جدولة...")
     
     # تشغيل البوت حتى يضغط المستخدم Ctrl-C
     application.run_polling()

@@ -1,5 +1,5 @@
 # مكتبات أساسية للبوت
-python-telegram-bot==20.7
+python-telegram-bot[job-queue]==20.7
 aiohttp==3.9.1
 
 # معالجة البيانات والنصوص
@@ -19,3 +19,6 @@ python-dotenv==1.0.0
 
 # خادم الويب للتوافق مع Render
 Flask==3.0.0
+
+# جدولة المهام (بديل لـ JobQueue)
+APScheduler==3.10.4
