@@ -232,8 +232,24 @@ def main() -> None:
         
         # إرسال الرسالة التجريبية بعد ثانيتين
         import asyncio
-        asyncio.create_task(asyncio.sleep(2))
-        asyncio.create_task(send_test_message())
+        import threading
+        import time
+        
+        def send_test_message_delayed():
+            time.sleep(2)
+            try:
+                # إنشاء event loop جديد للرسالة التجريبية
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                loop.run_until_complete(send_test_message())
+                loop.close()
+            except Exception as e:
+                logger.error(f"فشل في إرسال الرسالة التجريبية: {e}")
+        
+        # إرسال الرسالة التجريبية في thread منفصل
+        thread = threading.Thread(target=send_test_message_delayed)
+        thread.daemon = True
+        thread.start()
     else:
         logger.warning("⚠️ JobQueue غير متاح. استخدام APScheduler كبديل...")
         try:
@@ -304,8 +320,24 @@ def main() -> None:
             
             # إرسال الرسالة التجريبية بعد ثانيتين
             import asyncio
-            asyncio.create_task(asyncio.sleep(2))
-            asyncio.create_task(send_test_message())
+            import threading
+            import time
+            
+            def send_test_message_delayed():
+                time.sleep(2)
+                try:
+                    # إنشاء event loop جديد للرسالة التجريبية
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    loop.run_until_complete(send_test_message())
+                    loop.close()
+                except Exception as e:
+                    logger.error(f"فشل في إرسال الرسالة التجريبية: {e}")
+            
+            # إرسال الرسالة التجريبية في thread منفصل
+            thread = threading.Thread(target=send_test_message_delayed)
+            thread.daemon = True
+            thread.start()
         except ImportError:
             logger.error("❌ APScheduler غير متاح. البوت سيعمل بدون جدولة تلقائية.")
             logger.info("🚀 بوت أخبار الجزائر بدأ العمل بدون جدولة...")
