@@ -246,9 +246,9 @@ def main() -> None:
         def send_test_message_delayed():
             time.sleep(2)
             try:
-                # استخدم event loop الخاص بـ application
-                loop = application.bot.loop if hasattr(application.bot, 'loop') else application.loop
+                # استخدم event loop الخاص بـ application بشكل صحيح
                 import asyncio
+                loop = asyncio.get_event_loop()
                 asyncio.run_coroutine_threadsafe(send_test_message(), loop)
             except Exception as e:
                 logger.error(f"فشل في إرسال الرسالة التجريبية: {e}")
@@ -332,9 +332,9 @@ def main() -> None:
             def send_test_message_delayed():
                 time.sleep(2)
                 try:
-                    # استخدم event loop الخاص بـ application
-                    loop = application.bot.loop if hasattr(application.bot, 'loop') else application.loop
+                    # استخدم event loop الخاص بـ application بشكل صحيح
                     import asyncio
+                    loop = asyncio.get_event_loop()
                     asyncio.run_coroutine_threadsafe(send_test_message(), loop)
                 except Exception as e:
                     logger.error(f"فشل في إرسال الرسالة التجريبية: {e}")
@@ -460,26 +460,32 @@ async def fetch_and_send_news(context):
     from database import get_db_session, get_random_unsent_high_sentiment_article
 
     logger.info("🔄 بدء دورة جلب الأخبار الجديدة...")
+    logger.info(f"📊 عدد المصادر: {len(NEWS_SOURCES)}")
     session = get_db_session()
     
     # معالجة المصادر بشكل متزامن على نفس event loop
     tasks = [process_source(source, session) for source in NEWS_SOURCES]
+    logger.info(f"🚀 بدء معالجة {len(tasks)} مصدر بشكل متزامن...")
     results = await asyncio.gather(*tasks)
     
     # تجميع جميع المقالات الجديدة
     all_new_articles = [article for sublist in results for article in sublist]
+    logger.info(f"📰 تم العثور على {len(all_new_articles)} مقال جديد من جميع المصادر")
     
     # فلترة الأخبار للـ 24 ساعة الماضية فقط
     twenty_four_hours_ago = datetime.datetime.utcnow() - datetime.timedelta(hours=24)
     recent_articles = [article for article in all_new_articles 
                       if article.published_date >= twenty_four_hours_ago]
     
+    logger.info(f"⏰ تم فلترة {len(recent_articles)} مقال من آخر 24 ساعة")
+    
     if recent_articles:
         session.commit()
-        logger.info(f"تم العثور على {len(recent_articles)} مقال جديد خلال آخر 24 ساعة")
+        logger.info(f"✅ تم حفظ {len(recent_articles)} مقال جديد في قاعدة البيانات")
     else:
         session.rollback()
-        logger.info("لم يتم العثور على أخبار جديدة خلال آخر 24 ساعة")
+        logger.info("❌ لم يتم العثور على أخبار جديدة خلال آخر 24 ساعة")
+        return  # خروج مبكر إذا لم تكن هناك أخبار جديدة
 
     # ترتيب وتنويع الأخبار حسب الأولوية
     if recent_articles:
