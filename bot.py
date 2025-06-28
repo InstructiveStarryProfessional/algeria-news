@@ -522,13 +522,16 @@ async def fetch_and_send_news(context):
         urgent_local_news = [a for a in urgent_news if a in local_news]
         other_news = [a for a in prioritized_articles if a not in urgent_local_news]
 
+        logger.info(f"بدء إرسال {len(urgent_local_news)} خبر عاجل محلي")
         for i, article in enumerate(urgent_local_news):
             try:
+                logger.info(f"إرسال الخبر العاجل المحلي {i+1}/{len(urgent_local_news)}: {article.title}")
                 await send_article_to_telegram(context.bot, article)
                 article.sent_to_telegram = True
                 session.commit()
                 bot_stats.add_article(article.source, article.category)
                 await notification_manager.notify_users(article, article.category)
+                logger.info(f"✅ تم إرسال الخبر العاجل المحلي: {article.title}")
                 logger.info("انتظار 30 ثانية (خبر عاجل محلي) قبل إرسال الخبر التالي")
                 await asyncio.sleep(30)
             except Exception as e:
@@ -536,9 +539,11 @@ async def fetch_and_send_news(context):
                 error_stats.record_error(e, "send_article_loop")
                 session.rollback()
 
+        logger.info(f"بدء إرسال {len(other_news)} خبر آخر")
         # ثم: إرسال بقية الأخبار (العالمية والمحلية غير العاجلة) بفاصل 30 ثانية بين كل خبر
         for i, article in enumerate(other_news):
             try:
+                logger.info(f"إرسال الخبر {i+1}/{len(other_news)}: {article.title}")
                 await send_article_to_telegram(context.bot, article)
                 article.sent_to_telegram = True
                 session.commit()
@@ -601,6 +606,8 @@ async def read_more_callback(update: Update, context: CallbackContext):
 
 async def send_article_to_telegram(bot, article):
     """تنسيق وإرسال مقال واحد إلى قناة التليجرام مع عرض محسن للمحتوى."""
+    logger.info(f"🚀 بدء إرسال المقال: {article.title}")
+    
     from classifier import classify_article, get_emoji_for_category
 
     category = classify_article(article.title, article.summary)
@@ -630,6 +637,7 @@ async def send_article_to_telegram(bot, article):
     message += f"{hashtags}"
 
     text = message
+    logger.info(f"📝 تم تنسيق الرسالة للمقال: {title}")
 
     try:
         # التحقق من وجود محتوى مرئي (فيديو أو صورة)
@@ -641,6 +649,7 @@ async def send_article_to_telegram(bot, article):
             try:
                 # تحويل معرف القناة إذا لزم الأمر
                 channel_id = await get_channel_id(bot, TELEGRAM_CHANNEL_ID)
+                logger.info(f"📹 إرسال فيديو مباشر للمقال: {title}")
                 
                 await bot.send_video(
                     chat_id=channel_id,
@@ -648,10 +657,10 @@ async def send_article_to_telegram(bot, article):
                     caption=text,
                     parse_mode=ParseMode.HTML
                 )
-                logger.info(f"تم إرسال مقال مع فيديو: {title}")
+                logger.info(f"✅ تم إرسال مقال مع فيديو: {title}")
                 return
             except Exception as e:
-                logger.error(f"فشل في إرسال الفيديو للمقال {title}: {e}")
+                logger.error(f"❌ فشل في إرسال الفيديو للمقال {title}: {e}")
                 # في حالة فشل إرسال الفيديو، نستمر لإرسال الخبر مع الصورة أو بدونها
         
         # إذا كان هناك فيديو يوتيوب، نضيف رابطه في النص
@@ -670,30 +679,40 @@ async def send_article_to_telegram(bot, article):
             cached_image = cache_manager.get_cached_image(image_url)
             image_url = cached_image
         
+        logger.info(f"📤 إرسال المقال عبر _send_telegram_message: {title}")
         await _send_telegram_message(bot, image_url, text, title, category, article.id, parse_mode=ParseMode.HTML)
+        logger.info(f"✅ تم إرسال المقال بنجاح: {title}")
         
     except Exception as e:
         log_error(e, f"send_article_to_telegram: {title}")
         error_stats.record_error(e, "send_article_to_telegram")
+        logger.error(f"❌ فشل في إرسال المقال: {title} - {e}")
         # محاولة إرسال بدون صورة في حالة فشل إرسال الصورة
         try:
+            logger.info(f"🔄 محاولة إرسال المقال بدون صورة: {title}")
             await _send_telegram_message(bot, None, text, title, category, article.id)
+            logger.info(f"✅ تم إرسال المقال بدون صورة: {title}")
         except Exception as e2:
             log_error(e2, f"send_article_to_telegram_fallback: {title}")
             error_stats.record_error(e2, "send_article_to_telegram_fallback")
+            logger.error(f"❌ فشل في إرسال المقال بدون صورة: {title} - {e2}")
 
 @handle_telegram_error
 @retry_on_failure(max_retries=2)
 async def _send_telegram_message(bot, image_url, text, title, category, article_id, parse_mode=ParseMode.HTML):
     """إرسال رسالة إلى التليجرام مع معالجة الأخطاء"""
+    logger.info(f"📨 بدء _send_telegram_message للمقال: {title}")
+    
     keyboard = [[InlineKeyboardButton("📰 قراءة المزيد", callback_data=f'read_more:{article_id}')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     # تحويل معرف القناة إذا لزم الأمر
     channel_id = await get_channel_id(bot, TELEGRAM_CHANNEL_ID)
+    logger.info(f"📢 إرسال إلى القناة: {channel_id}")
 
     if image_url:
         # إرسال الصورة مع النص
+        logger.info(f"🖼️ إرسال مقال مع صورة: {title}")
         await bot.send_photo(
             chat_id=channel_id,
             photo=image_url,
@@ -701,9 +720,10 @@ async def _send_telegram_message(bot, image_url, text, title, category, article_
             parse_mode=parse_mode,
             reply_markup=reply_markup
         )
-        logger.info(f"تم إرسال مقال مع صورة: {title} (الفئة: {category})")
+        logger.info(f"✅ تم إرسال مقال مع صورة: {title} (الفئة: {category})")
     else:
         # إرسال نص فقط مع معاينة الرابط
+        logger.info(f"📝 إرسال مقال نصي: {title}")
         await bot.send_message(
             chat_id=channel_id,
             text=text,
@@ -711,7 +731,7 @@ async def _send_telegram_message(bot, image_url, text, title, category, article_
             disable_web_page_preview=False,  # إظهار معاينة الرابط
             reply_markup=reply_markup
         )
-        logger.info(f"تم إرسال مقال نصي: {title} (الفئة: {category})")
+        logger.info(f"✅ تم إرسال مقال نصي: {title} (الفئة: {category})")
 
 
 if __name__ == "__main__":
