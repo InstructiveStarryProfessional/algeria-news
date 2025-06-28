@@ -22,6 +22,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+async def get_channel_id(bot, channel_username):
+    """تحويل معرف القناة من @username إلى معرف رقمي"""
+    try:
+        if channel_username.startswith('@'):
+            chat = await bot.get_chat(channel_username)
+            return str(chat.id)
+        return channel_username
+    except Exception as e:
+        logger.error(f"خطأ في تحويل معرف القناة {channel_username}: {e}")
+        return channel_username
+
 # تم حذف أوامر التشغيل - البوت يعمل تلقائياً الآن
 
 async def stats_command(update, context):
@@ -203,6 +214,26 @@ def main() -> None:
         logger.info("🚀 بوت أخبار الجزائر بدأ العمل تلقائياً...")
         logger.info("📰 سيتم جلب الأخبار فور صدورها ونشرها كل 30 ثانية")
         logger.info("🗂️ سيتم تنظيف التخزين المؤقت كل ساعة")
+        
+        # إرسال رسالة تجريبية للتأكد من أن البوت يمكنه الكتابة في القناة
+        async def send_test_message():
+            try:
+                # تحويل معرف القناة إذا لزم الأمر
+                channel_id = await get_channel_id(application.bot, TELEGRAM_CHANNEL_ID)
+                
+                await application.bot.send_message(
+                    chat_id=channel_id,
+                    text="🤖 *بوت أخبار الجزائر يعمل الآن!*\n\n✅ تم تشغيل البوت بنجاح\n📰 سيتم نشر الأخبار تلقائياً كل 30 ثانية\n🔗 المصادر: APS, الإذاعة, التلفزيون, الشروق, النهار, الخبر",
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                logger.info("✅ تم إرسال رسالة تجريبية بنجاح")
+            except Exception as e:
+                logger.error(f"❌ فشل في إرسال الرسالة التجريبية: {e}")
+        
+        # إرسال الرسالة التجريبية بعد ثانيتين
+        import asyncio
+        asyncio.create_task(asyncio.sleep(2))
+        asyncio.create_task(send_test_message())
     else:
         logger.warning("⚠️ JobQueue غير متاح. استخدام APScheduler كبديل...")
         try:
@@ -211,9 +242,33 @@ def main() -> None:
             
             scheduler = AsyncIOScheduler()
             
+            # إنشاء wrapper function للتعامل مع APScheduler
+            async def fetch_news_wrapper():
+                """Wrapper function للتعامل مع APScheduler"""
+                try:
+                    # إنشاء context object بسيط مع bot
+                    class SimpleContext:
+                        def __init__(self, bot):
+                            self.bot = bot
+                    
+                    context = SimpleContext(application.bot)
+                    await fetch_and_send_news(context)
+                except Exception as e:
+                    logger.error(f"خطأ في fetch_news_wrapper: {e}")
+                    # محاولة إرسال رسالة خطأ للقناة
+                    try:
+                        channel_id = await get_channel_id(application.bot, TELEGRAM_CHANNEL_ID)
+                        await application.bot.send_message(
+                            chat_id=channel_id,
+                            text="⚠️ *تنبيه:* حدث خطأ في جلب الأخبار\n\nسيتم المحاولة مرة أخرى في الدورة القادمة.",
+                            parse_mode=ParseMode.MARKDOWN
+                        )
+                    except Exception as send_error:
+                        logger.error(f"فشل في إرسال رسالة الخطأ: {send_error}")
+            
             # جدولة مهمة جمع الأخبار كل 30 ثانية
             scheduler.add_job(
-                fetch_and_send_news,
+                fetch_news_wrapper,
                 IntervalTrigger(seconds=30),
                 id='fetch_news',
                 replace_existing=True
@@ -231,6 +286,26 @@ def main() -> None:
             logger.info("🚀 بوت أخبار الجزائر بدأ العمل مع APScheduler...")
             logger.info("📰 سيتم جلب الأخبار فور صدورها ونشرها كل 30 ثانية")
             logger.info("🗂️ سيتم تنظيف التخزين المؤقت كل ساعة")
+            
+            # إرسال رسالة تجريبية للتأكد من أن البوت يمكنه الكتابة في القناة
+            async def send_test_message():
+                try:
+                    # تحويل معرف القناة إذا لزم الأمر
+                    channel_id = await get_channel_id(application.bot, TELEGRAM_CHANNEL_ID)
+                    
+                    await application.bot.send_message(
+                        chat_id=channel_id,
+                        text="🤖 *بوت أخبار الجزائر يعمل الآن!*\n\n✅ تم تشغيل البوت بنجاح\n📰 سيتم نشر الأخبار تلقائياً كل 30 ثانية\n🔗 المصادر: APS, الإذاعة, التلفزيون, الشروق, النهار, الخبر",
+                        parse_mode=ParseMode.MARKDOWN
+                    )
+                    logger.info("✅ تم إرسال رسالة تجريبية بنجاح")
+                except Exception as e:
+                    logger.error(f"❌ فشل في إرسال الرسالة التجريبية: {e}")
+            
+            # إرسال الرسالة التجريبية بعد ثانيتين
+            import asyncio
+            asyncio.create_task(asyncio.sleep(2))
+            asyncio.create_task(send_test_message())
         except ImportError:
             logger.error("❌ APScheduler غير متاح. البوت سيعمل بدون جدولة تلقائية.")
             logger.info("🚀 بوت أخبار الجزائر بدأ العمل بدون جدولة...")
@@ -532,8 +607,11 @@ async def send_article_to_telegram(bot, article):
         # إذا كان هناك فيديو مباشر (ليس يوتيوب)، نرسله مع النص
         if video_url and not is_youtube_url(video_url):
             try:
+                # تحويل معرف القناة إذا لزم الأمر
+                channel_id = await get_channel_id(bot, TELEGRAM_CHANNEL_ID)
+                
                 await bot.send_video(
-                    chat_id=TELEGRAM_CHANNEL_ID,
+                    chat_id=channel_id,
                     video=video_url,
                     caption=text,
                     parse_mode=ParseMode.HTML
@@ -579,10 +657,13 @@ async def _send_telegram_message(bot, image_url, text, title, category, article_
     keyboard = [[InlineKeyboardButton("📰 قراءة المزيد", callback_data=f'read_more:{article_id}')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
+    # تحويل معرف القناة إذا لزم الأمر
+    channel_id = await get_channel_id(bot, TELEGRAM_CHANNEL_ID)
+
     if image_url:
         # إرسال الصورة مع النص
         await bot.send_photo(
-            chat_id=TELEGRAM_CHANNEL_ID,
+            chat_id=channel_id,
             photo=image_url,
             caption=text,
             parse_mode=parse_mode,
@@ -592,7 +673,7 @@ async def _send_telegram_message(bot, image_url, text, title, category, article_
     else:
         # إرسال نص فقط مع معاينة الرابط
         await bot.send_message(
-            chat_id=TELEGRAM_CHANNEL_ID,
+            chat_id=channel_id,
             text=text,
             parse_mode=parse_mode,
             disable_web_page_preview=False,  # إظهار معاينة الرابط

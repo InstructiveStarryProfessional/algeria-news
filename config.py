@@ -10,6 +10,12 @@ load_dotenv()
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHANNEL_ID = os.getenv('TELEGRAM_CHANNEL_ID')
 
+# معالجة معرف القناة
+if TELEGRAM_CHANNEL_ID and TELEGRAM_CHANNEL_ID.startswith('@'):
+    # إذا كان المعرف يبدأ بـ @، نحتاج لتحويله إلى معرف رقمي
+    # سنستخدم المعرف كما هو وسيتم التحويل في البوت
+    pass
+
 # التحقق من وجود المتغيرات الأساسية
 if not TELEGRAM_BOT_TOKEN:
     raise ValueError("❌ TELEGRAM_BOT_TOKEN غير موجود في متغيرات البيئة")
